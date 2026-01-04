@@ -40,3 +40,6 @@ install_manifest.txt
 .DS_Store
 Thumbs.db
 
+# Excluded files
+include/bplus_tree.h
+
