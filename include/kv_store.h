@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
-#include <cstdint>
+#include <unordered_map> // hash map for key-value pairs
+#include <cstdint> // gives fixed width integers
 #include "file_manager.h"
 
 using namespace std;

@@ -26,7 +26,6 @@ string FileManager::read(size_t position, size_t size) {
     file_.read(&result[0], size); // read 'size' bytes into the string
 
     return result;
-
 }
 
 
@@ -45,11 +44,39 @@ uint64_t FileManager::write(const string& data) {
 
     // return the position where data was written
     return position;
-
 }
 
 uint64_t FileManager::size() {
     file_.seekg(0, ios::end);
     uint64_t size = file_.tellg();
     return size;
+}
+
+void FileManager::readPage(uint32_t page_id, Page& page) {
+    uint64_t page_offset = page_id * PAGE_SIZE;
+    uint64_t file_size = size();
+    // if offset beyond file size, page is empty, clear and return
+    if (page_offset >= file_size) {
+        page.clear();
+        return;
+    }
+
+    uint64_t bytes_to_read;
+    if (page_offset + PAGE_SIZE > file_size) {
+        bytes_to_read = file_size - page_offset;
+    } else {
+        bytes_to_read = PAGE_SIZE;
+    }
+
+    string page_data = read(page_offset, bytes_to_read);
+    page.clear();
+    page.writeBytes(0, page_data.c_str(), bytes_to_read);
+
+}
+
+void FileManager::writePage(uint32_t page_id, const Page& page) {
+    uint64_t page_offset = page_id * PAGE_SIZE;
+    file_.seekp(page_offset, ios::beg);
+    file_.write(page.data, PAGE_SIZE);
+    file_.flush();
 }

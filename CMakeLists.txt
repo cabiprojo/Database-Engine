@@ -11,10 +11,14 @@ include_directories(include)
 # Source files
 set(SOURCES
     src/file_manager.cpp
+    src/page.cpp
+    src/page_manager.cpp
 )
 
 set(HEADERS
     include/file_manager.h
+    include/page.h
+    include/page_manager.h
 )
 
 # Main executable
