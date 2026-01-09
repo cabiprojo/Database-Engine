@@ -25,7 +25,7 @@ bool BPlusTree::insert(const string& key, uint64_t value) {
     Node* newRightChild;
     Node* result = insertHelper(root_, key, value, promotedKey, newRightChild);
 
-
+    
     // if result from insertHelper is not nullptr, split root and create new root
     if (result != nullptr) {
         Node* oldRoot = root_;

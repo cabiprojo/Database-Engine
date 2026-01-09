@@ -2,8 +2,8 @@
 
 #include "page.h"
 #include <string>
-#include <fstream>
-#include <cstdint>
+#include <fstream> // for file input/output
+#include <cstdint> // gives fixed width integers
 using namespace std;
 
 class FileManager {
@@ -24,7 +24,7 @@ public:
     // data: the data to write
     // returns: the position where data was written
     uint64_t write(const string& data);
-    
+
     // get file size
     // returns: size of file in bytes
     uint64_t size();

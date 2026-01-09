@@ -7,37 +7,41 @@
 using namespace std;
 
 int main() {
-     // Test PageManager
-     PageManager pm("test_pages.db");
+    KVStore store("test_kv.db");
     
-     // Allocate a page
-     uint32_t page_id = pm.allocatePage();
-     std::cout << "Allocated page ID: " << page_id << std::endl;
-     
-     // Write data to page
-     Page page(true);  // zero-initialized
-     page.writeUint32(0, 12345);
-     page.writeString(100, "hello", 10);
-     
-     pm.writePage(page_id, page);
-     std::cout << "Wrote page " << page_id << std::endl;
-     
-     // Read it back
-     Page page2;
-     pm.readPage(page_id, page2);
-     
-     // Verify
-     uint32_t val = page2.readUint32(0);
-     std::string str = page2.readString(100, 5);
-     
-     std::cout << "Read value: " << val << std::endl;
-     std::cout << "Read string: " << str << std::endl;
-     
-     if (val == 12345 && str == "hello") {
-         std::cout << "SUCCESS! Phase 0 works!" << std::endl;
-     } else {
-         std::cout << "FAILED!" << std::endl;
-     }
-     
-     return 0;
+    // Test put
+    cout << "Testing put..." << endl;
+    store.put("key1", "value1");
+    store.put("key2", "value2");
+    store.put("key3", "hello world");
+    cout << "Put 3 keys" << endl;
+    
+    // Test get
+    cout << "\nTesting get..." << endl;
+    string val1 = store.get("key1");
+    string val2 = store.get("key2");
+    string val3 = store.get("key3");
+    
+    cout << "key1 = " << val1 << endl;
+    cout << "key2 = " << val2 << endl;
+    cout << "key3 = " << val3 << endl;
+    
+    // Verify
+    if (val1 == "value1" && val2 == "value2" && val3 == "hello world") {
+        cout << "\nSUCCESS! KVStore with pages works!" << endl;
+    } else {
+        cout << "\nFAILED!" << endl;
+    }
+    
+    // Test persistence (reopen and check)
+    cout << "\nTesting persistence..." << endl;
+    KVStore store2("test_kv.db");  // Reopen same file
+    string val1_again = store2.get("key1");
+    if (val1_again == "value1") {
+        cout << "Persistence works! Got: " << val1_again << endl;
+    } else {
+        cout << "Persistence failed!" << endl;
+    }
+    
+    return 0;
 }

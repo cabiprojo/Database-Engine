@@ -3,8 +3,18 @@
 // constructor, :: prefix means it's member of the FileManager class
 FileManager::FileManager(const string& filename) : filename_(filename) {
 
-    // ios:: binary means binary mode, app means append mode, in means input mode, out means output mode
-    file_.open(filename_, ios::binary | ios::app | ios::in | ios::out); // ios is input/output stream
+    // Open file for reading and writing at specific offsets
+    // ios::binary = binary mode
+    // ios::in = input (read)
+    // ios::out = output (write)
+    // First try to open existing file, if fails create new one
+    file_.open(filename_, ios::binary | ios::in | ios::out);
+    if (!file_.is_open()) {
+        // File doesn't exist, create it
+        file_.open(filename_, ios::binary | ios::out);
+        file_.close();
+        file_.open(filename_, ios::binary | ios::in | ios::out);
+    }
 
 }
 
@@ -76,6 +86,19 @@ void FileManager::readPage(uint32_t page_id, Page& page) {
 
 void FileManager::writePage(uint32_t page_id, const Page& page) {
     uint64_t page_offset = page_id * PAGE_SIZE;
+    uint64_t required_size = page_offset + PAGE_SIZE;
+    uint64_t current_size = size();
+    
+    // Extend file if necessary (fill with zeros)
+    if (required_size > current_size) {
+        file_.seekp(0, ios::end);
+        uint64_t bytes_to_add = required_size - current_size;
+        string zeros(bytes_to_add, '\0');
+        file_.write(zeros.c_str(), bytes_to_add);
+        file_.flush();
+    }
+    
+    // Now write the page at the correct offset
     file_.seekp(page_offset, ios::beg);
     file_.write(page.data, PAGE_SIZE);
     file_.flush();

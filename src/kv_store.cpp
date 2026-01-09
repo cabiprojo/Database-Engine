@@ -1,8 +1,8 @@
 #include "kv_store.h"
-#include "file_manager.h"
+#include "page_manager.h"
 #include <iostream>
 
-KVStore::KVStore(const string& filename) : file_manager_(filename) {
+KVStore::KVStore(const string& filename) : page_manager_(filename), current_page_id_(0), current_offset_(0) {
     // rebuild the index from the file
     rebuildIndex();
 }
@@ -10,53 +10,74 @@ KVStore::KVStore(const string& filename) : file_manager_(filename) {
 KVStore::~KVStore() {
     // FileManager destructor will automatically close the file
     // Index will be automatically destroyed
-    
 }
 
 bool KVStore::put(const string& key, const string& value) {
-    // format key value pair for storage
+    // calculate record size
     uint32_t key_len = key.size();
     uint32_t value_len = value.size();
+    uint32_t record_size = 4 + key_len + 4 + value_len;
+ 
+    // check if record fits in current page
+    if (current_offset_ + record_size > PAGE_SIZE) {
+        // allocate new page
+        current_page_id_ = page_manager_.allocatePage();
+        current_offset_ = 0;
+    }
 
-    string data;
-    data.reserve(key_len + value_len + 8); // reserve is used to allocate memory for the string
-    data.append(reinterpret_cast<const char*>(&key_len), sizeof(key_len)); // reinterpret_cast is used to convert the pointer to a char pointer
-    data.append(key);
-    data.append(reinterpret_cast<const char*>(&value_len), sizeof(value_len));
-    data.append(value);
+    // load current page (or create empty if none)
+    Page page;
+    page_manager_.readPage(current_page_id_, page);
 
-    // write to file using file manager
-    uint64_t position = file_manager_.write(data);
+    // write record to page at current offset
+    uint32_t offset = current_offset_;
+    page.writeUint32(offset, key_len);
+    offset += 4;
+    page.writeString(offset, key, key_len);
+    offset += key_len;
+    page.writeUint32(offset, value_len);
+    offset += 4;
+    page.writeString(offset, value, value_len);
 
-    // update index with new position
-    index_[key] = position;
+    // save page back to disk
+    page_manager_.writePage(current_page_id_, page);
 
+    // update index with (page_id, offset)
+    index_[key] = {current_page_id_, current_offset_};
+
+    // update current offset
+    current_offset_ += record_size;
+ 
     return true;
 }
 
 string KVStore::get(const string& key) {
-    // look up key in index. check if key exists in index, if not, return empty string
+    // check if key exists in index, if not, return empty string
     if (index_.find(key) == index_.end()) { 
         return "";
     }
 
-    // get position from index
-    uint64_t position = index_[key];
+    // look up key in index (page_id, offset)
+    uint32_t page_id = index_[key].first;
+    uint32_t offset = index_[key].second;
 
-    // read key length (4 bytes)
-    string bytes = file_manager_.read(position, 4);
-    uint32_t key_len = *reinterpret_cast<const uint32_t*>(bytes.c_str());
+    // load that page from disk
+    Page page;
+    page_manager_.readPage(page_id, page);
 
-    // skip key since we already read it
-    position += 4 + key_len;
+    // read record from page at that offset
+    uint32_t key_len = page.readUint32(offset);
+    offset += 4;
+
+    // skip key
+    offset += key_len;
 
     // read value length (4 bytes)
-    bytes = file_manager_.read(position, 4);
-    uint32_t value_len = *reinterpret_cast<const uint32_t*>(bytes.c_str());
+    uint32_t value_len = page.readUint32(offset);
+    offset += 4;
 
-    // skip value length (4 bytes) and read the value
-    position += 4;
-    string value = file_manager_.read(position, value_len);
+    // read value
+    string value = page.readString(offset, value_len);
 
     // return the value
     return value;
@@ -76,42 +97,62 @@ bool KVStore::remove(const string& key) {
 
 void KVStore::rebuildIndex() {
     // start at beginning of file
-    uint64_t position = 0;
-    uint64_t file_size = file_manager_.size();
+    uint32_t page_id = 0;
+    current_page_id_ = 0;
+    current_offset_ = 0;
 
     while (true) {
-        uint64_t start = position; // start of record
-        
-        // if can't read or end of file, break
-        if (position + 4 > file_size) break;
+        // load page
+        Page page;
+        page_manager_.readPage(page_id, page);
 
-        // read key length (4 bytes)
-        string bytes = file_manager_.read(position, 4);
-        uint32_t key_len = *reinterpret_cast<const uint32_t*>(bytes.c_str());
-        position += 4;
+        // check if page is empty (all zeros or past end of file)
+        uint32_t offset = 0;
+        bool found_any = false; // flag to check if any records were found on this page
 
-        // check if can read key
-        if (position + key_len > file_size) break;
+        // scan page for records
+        while (offset + 4 <= PAGE_SIZE) {
+            // Save where this record starts
+            uint32_t record_start = offset;
+            
+            uint32_t key_len = page.readUint32(offset);
 
-        // read key
-        string key = file_manager_.read(position, key_len);
-        position += key_len;
+            if (key_len == 0 || key_len > PAGE_SIZE) break;
 
-        // check if can read value length
-        if (position + 4 > file_size) break;
+            offset += 4;
 
-        // read value length
-        bytes = file_manager_.read(position, 4);
-        uint32_t value_len = *reinterpret_cast<const uint32_t*>(bytes.c_str());
-        position += 4;
+            if (offset + key_len > PAGE_SIZE) break;
 
-        // check if can read value
-        if (position + value_len > file_size) break;
+            // read key
+            string key = page.readString(offset, key_len);
+            offset += key_len;
 
-        // add to index
-        index_[key] = start;
+            if (offset + 4 > PAGE_SIZE) break;
 
-        // move to next record
-        position += value_len;
+            uint32_t value_len = page.readUint32(offset);
+            offset += 4;
+
+            if (offset + value_len > PAGE_SIZE) break;
+
+            // Store in index using the saved record_start
+            index_[key] = {page_id, record_start};
+            found_any = true;
+
+            offset += value_len;
+
+        }
+
+        // update current position
+        if (found_any) {
+            current_page_id_ = page_id;
+            current_offset_ = offset;
+        }
+
+        // if page was empty, break
+        if (!found_any && page_id > 0) {
+            break;
+        }
+
+        page_id++;
     }
 }

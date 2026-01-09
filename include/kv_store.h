@@ -3,7 +3,8 @@
 #include <string>
 #include <unordered_map> // hash map for key-value pairs
 #include <cstdint> // gives fixed width integers
-#include "file_manager.h"
+#include "page_manager.h"
+#include <utility> // for pair
 
 using namespace std;
 
@@ -26,8 +27,10 @@ public:
     bool remove(const string& key);
 
 private:
-    FileManager file_manager_;
-    unordered_map<string, uint64_t> index_;
+    PageManager page_manager_;
+    unordered_map<string, pair<uint32_t, uint32_t>> index_; // key -> (page_id, offset)
     void rebuildIndex();
+    uint32_t current_page_id_;
+    uint32_t current_offset_;
 };
 
