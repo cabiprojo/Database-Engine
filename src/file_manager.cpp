@@ -1,4 +1,4 @@
-#include "file_manager.h" // include the header file
+#include "file_manager.h" 
 
 // constructor, :: prefix means it's member of the FileManager class
 FileManager::FileManager(const string& filename) : filename_(filename) {

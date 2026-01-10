@@ -3,6 +3,8 @@
 #include <iostream>
 
 KVStore::KVStore(const string& filename) : page_manager_(filename), current_page_id_(0), current_offset_(0) {
+    // Create BufferPool with PageManager
+    buffer_pool_ = new BufferPool(&page_manager_, 100);
     // rebuild the index from the file
     rebuildIndex();
 }
@@ -10,6 +12,7 @@ KVStore::KVStore(const string& filename) : page_manager_(filename), current_page
 KVStore::~KVStore() {
     // FileManager destructor will automatically close the file
     // Index will be automatically destroyed
+    delete buffer_pool_;
 }
 
 bool KVStore::put(const string& key, const string& value) {
@@ -25,9 +28,9 @@ bool KVStore::put(const string& key, const string& value) {
         current_offset_ = 0;
     }
 
-    // load current page (or create empty if none)
+    // load current page (or create empty if none) using BufferPool cache
     Page page;
-    page_manager_.readPage(current_page_id_, page);
+    buffer_pool_->getPage(current_page_id_, page);
 
     // write record to page at current offset
     uint32_t offset = current_offset_;
@@ -39,8 +42,8 @@ bool KVStore::put(const string& key, const string& value) {
     offset += 4;
     page.writeString(offset, value, value_len);
 
-    // save page back to disk
-    page_manager_.writePage(current_page_id_, page);
+    // save page back to cache (will write to disk when flushed/evicted)
+    buffer_pool_->savePage(current_page_id_, page);
 
     // update index with (page_id, offset)
     index_[key] = {current_page_id_, current_offset_};
@@ -61,9 +64,9 @@ string KVStore::get(const string& key) {
     uint32_t page_id = index_[key].first;
     uint32_t offset = index_[key].second;
 
-    // load that page from disk
+    // load that page from cache or disk using BufferPool cache
     Page page;
-    page_manager_.readPage(page_id, page);
+    buffer_pool_->getPage(page_id, page);
 
     // read record from page at that offset
     uint32_t key_len = page.readUint32(offset);
@@ -102,9 +105,9 @@ void KVStore::rebuildIndex() {
     current_offset_ = 0;
 
     while (true) {
-        // load page
+        // load page from cache or disk using BufferPool cache
         Page page;
-        page_manager_.readPage(page_id, page);
+        buffer_pool_->getPage(page_id, page);
 
         // check if page is empty (all zeros or past end of file)
         uint32_t offset = 0;

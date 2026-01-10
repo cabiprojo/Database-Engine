@@ -13,12 +13,15 @@ set(SOURCES
     src/file_manager.cpp
     src/page.cpp
     src/page_manager.cpp
+    src/buffer_pool.cpp
+    src/kv_store.cpp
 )
 
 set(HEADERS
     include/file_manager.h
     include/page.h
     include/page_manager.h
+    include/buffer_pool.h
 )
 
 # Main executable

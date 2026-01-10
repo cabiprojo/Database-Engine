@@ -5,6 +5,7 @@
 #include <cstdint> // gives fixed width integers
 #include "page_manager.h"
 #include <utility> // for pair
+#include "buffer_pool.h"
 
 using namespace std;
 
@@ -28,6 +29,7 @@ public:
 
 private:
     PageManager page_manager_;
+    BufferPool* buffer_pool_;
     unordered_map<string, pair<uint32_t, uint32_t>> index_; // key -> (page_id, offset)
     void rebuildIndex();
     uint32_t current_page_id_;
