@@ -6,6 +6,7 @@
 // create empty tree
 BPlusTree::BPlusTree(BufferPool* buffer_pool, PageManager* page_manager, 
     int order) : buffer_pool_(buffer_pool), page_manager_(page_manager), order_(order), root_page_id_(0) {
+    loadRootPageId();  // restore root_page_id_ from disk (page 0)
 }
 
 bool BPlusTree::insert(const string& key, uint64_t value) {
@@ -24,6 +25,7 @@ bool BPlusTree::insert(const string& key, uint64_t value) {
 
         // save to page
         saveNode(root_page_id_, node);
+        saveRootPageId();  // persist root_page_id_ to disk (page 0)
 
         return true;
     }
@@ -48,6 +50,7 @@ bool BPlusTree::insert(const string& key, uint64_t value) {
         newRoot.children_page_ids.push_back(oldRootPageId);
         newRoot.children_page_ids.push_back(newRightChildPageId);
         saveNode(root_page_id_, newRoot);
+        saveRootPageId();  // persist root_page_id_ to disk (page 0)
     }
 
     return true;
@@ -333,6 +336,10 @@ void Node::deserializeFromPage(const Page& page) {
 }
 
 void BPlusTree::loadNode(uint32_t page_id, Node& node) {
+    if (!buffer_pool_) {
+        return;
+    }
+    
     // load page from BufferPool
     Page page;
     buffer_pool_->getPage(page_id, page);
@@ -346,8 +353,12 @@ void BPlusTree::loadNode(uint32_t page_id, Node& node) {
 }
 
 void BPlusTree::saveNode(uint32_t page_id, const Node& node) {
+    if (!buffer_pool_) {
+        return;
+    }
+    
     // serialize node to page
-    Page page;
+    Page page(true);  // clear page first to avoid garbage data
     node.serializeToPage(page);
 
     // save page to BufferPool
@@ -356,6 +367,10 @@ void BPlusTree::saveNode(uint32_t page_id, const Node& node) {
 }
 
 uint32_t BPlusTree::allocateNode(bool is_leaf) {
+    if (!page_manager_ || !buffer_pool_) {
+        return 0;
+    }
+    
     // allocate new page from PageManager
     uint32_t new_page_id = page_manager_->allocatePage();
     
@@ -382,6 +397,11 @@ void BPlusTree::loadRootPageId() {
     // initialize to 0 (empty tree) - default for new files
     root_page_id_ = 0;
     
+    // if buffer_pool_ is null, can't load (shouldn't happen, but safety check)
+    if (!buffer_pool_) {
+        return;
+    }
+    
     // try to load root_page_id_ from metadata page (page 0)
     // if file is new/empty, getPage will return an empty page, and readUint32(0) will return 0
     Page metadata_page(true);  // initialize with cleared page (all zeros)
@@ -394,8 +414,13 @@ void BPlusTree::loadRootPageId() {
 
 // save root_page_id_ to metadata page (page 0)
 void BPlusTree::saveRootPageId() {
-    // ensure page 0 exists (getPage will create it if needed)
-    Page metadata_page(true);  // initialize with cleared page
+    // if buffer_pool_ is null, can't save (shouldn't happen, but safety check)
+    if (!buffer_pool_) {
+        return;
+    }
+    
+    // load existing page 0 (or get empty page if new)
+    Page metadata_page;
     buffer_pool_->getPage(0, metadata_page);
     
     // write root_page_id_ to offset 0 (first 4 bytes of page 0)

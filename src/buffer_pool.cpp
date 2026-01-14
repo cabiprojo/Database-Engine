@@ -26,6 +26,10 @@ void BufferPool::getPage(uint32_t page_id, Page& page) {
     }
 
     // load page from disk
+    if (!page_manager_) {
+        page.clear();
+        return;
+    }
     page_manager_->readPage(page_id, page);
 
     // add to cache
@@ -89,6 +93,7 @@ void BufferPool::flushPage(uint32_t page_id) {
     if (dirty_.find(page_id) == dirty_.end() || !dirty_[page_id]) return;
 
     // write page to disk
+    if (!page_manager_) return;
     page_manager_->writePage(page_id, cache_[page_id]);
 
     // mark page as clean
