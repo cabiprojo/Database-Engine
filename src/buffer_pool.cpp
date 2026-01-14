@@ -20,7 +20,9 @@ void BufferPool::getPage(uint32_t page_id, Page& page) {
 
     // if not (cache miss) and cache is full, evict a page to make space
     if (cache_.size() >= max_pages_) {
-        evictPage(lru_list_.back());
+        if (!lru_list_.empty()) {
+            evictPage(lru_list_.back());
+        }
     }
 
     // load page from disk
@@ -68,12 +70,12 @@ void BufferPool::flushAll() {
 
 void BufferPool::moveToFront(uint32_t page_id) {
     if (lru_map_.find(page_id) != lru_map_.end()) {
-        // Already tracked - move to front
+        // already tracked - move to front
         auto iterator = lru_map_[page_id];
         lru_list_.splice(lru_list_.begin(), lru_list_, iterator);
         lru_map_[page_id] = lru_list_.begin();
     } else {
-        // Not tracked yet - add to front
+        // not tracked yet - add to front
         lru_list_.push_front(page_id);
         lru_map_[page_id] = lru_list_.begin();
     }
@@ -83,8 +85,8 @@ void BufferPool::flushPage(uint32_t page_id) {
     // check if page exists in cache
     if (cache_.find(page_id) == cache_.end()) return;
 
-    // check if page is dirty
-    if (!dirty_[page_id]) return;
+    // check if page is dirty (and exists in dirty map)
+    if (dirty_.find(page_id) == dirty_.end() || !dirty_[page_id]) return;
 
     // write page to disk
     page_manager_->writePage(page_id, cache_[page_id]);
@@ -95,10 +97,10 @@ void BufferPool::flushPage(uint32_t page_id) {
 
 void BufferPool::evictPage(uint32_t page_id) {
     // check if page is pinned because can't evict in use pages
-    if (pinned_[page_id]) return;
+    if (pinned_.find(page_id) != pinned_.end() && pinned_[page_id]) return;
 
     // flush if dirty
-    if (dirty_[page_id]) {
+    if (dirty_.find(page_id) != dirty_.end() && dirty_[page_id]) {
         flushPage(page_id);
     }
 

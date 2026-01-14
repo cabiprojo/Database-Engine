@@ -3,15 +3,15 @@
 #include <iostream>
 
 KVStore::KVStore(const string& filename) : page_manager_(filename), current_page_id_(0), current_offset_(0) {
-    // Create BufferPool with PageManager
+    // create BufferPool with PageManager
     buffer_pool_ = new BufferPool(&page_manager_, 100);
     // rebuild the index from the file
     rebuildIndex();
 }
 
 KVStore::~KVStore() {
-    // FileManager destructor will automatically close the file
-    // Index will be automatically destroyed
+    // file manager destructor will automatically close the file
+    // index will be automatically destroyed
     delete buffer_pool_;
 }
 
@@ -115,7 +115,7 @@ void KVStore::rebuildIndex() {
 
         // scan page for records
         while (offset + 4 <= PAGE_SIZE) {
-            // Save where this record starts
+            // save where this record starts
             uint32_t record_start = offset;
             
             uint32_t key_len = page.readUint32(offset);
@@ -137,7 +137,7 @@ void KVStore::rebuildIndex() {
 
             if (offset + value_len > PAGE_SIZE) break;
 
-            // Store in index using the saved record_start
+            // store in index using the saved record_start
             index_[key] = {page_id, record_start};
             found_any = true;
 

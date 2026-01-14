@@ -15,6 +15,7 @@ set(SOURCES
     src/page_manager.cpp
     src/buffer_pool.cpp
     src/kv_store.cpp
+    src/bplus_tree.cpp
 )
 
 set(HEADERS
@@ -22,6 +23,7 @@ set(HEADERS
     include/page.h
     include/page_manager.h
     include/buffer_pool.h
+    include/bplus_tree.h
 )
 
 # Main executable

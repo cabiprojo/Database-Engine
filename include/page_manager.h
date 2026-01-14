@@ -11,19 +11,19 @@ public:
     PageManager(const string& filename);
     ~PageManager();
     
-    // Allocate a new page (returns page ID)
+    // allocate a new page (returns page ID)
     uint32_t allocatePage();
     
-    // Read a page from disk
+    // read a page from disk
     void readPage(uint32_t page_id, Page& page);
     
-    // Write a page to disk
+    // write a page to disk
     void writePage(uint32_t page_id, const Page& page);
     
-    // Free a page (add to free list - simple version for now)
+    // free a page (add to free list - simple version for now)
     void freePage(uint32_t page_id);
     
 private:
     FileManager file_manager_;
-    uint32_t next_page_id_;  // Track next page to allocate
+    uint32_t next_page_id_;  // track next page to allocate
 };
